@@ -39,7 +39,7 @@ def rpc(method,params=None):
 
 def identifier(value):return isinstance(value,str) and bool(IDENTIFIER.fullmatch(value))
 
-def safe_key(value):return isinstance(value,str) and bool(KEY.fullmatch(value)) and not PRIVATE.search(value)
+def safe_key(value):return isinstance(value,str) and bool(KEY.fullmatch(value)) and not PRIVATE.search(value) and not value.startswith('device_')
 
 def safe_string(value):
     # Conservative portable strings: omit paths, URLs, commands and credential-like data.
