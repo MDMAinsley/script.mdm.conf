@@ -16,3 +16,20 @@ Implementation references:
 - Device information labels: https://kodi.wiki/view/InfoLabels
 
 Minimum manifest dependency is xbmc.python 3.0.0. Actual platform acceptance is recorded separately; declaration alone is not a compatibility claim.
+
+
+## Portable builds (0.2.0)
+
+Conf > Build backups provides Create build, Local builds, Cloud builds, storage connection check and Restore recovery. This first format saves addon IDs/versions, supported portable addon settings and supported skin/interface preferences. It does **not** clone all Kodi userdata or copy Windows binaries to Android. Custom artwork files, media databases, account credentials, URLs and machine-local paths are excluded; some widgets and skin customisations cannot transfer yet.
+
+Preview the downloaded build first. Install missing addons through enabled Kodi repositories, enable required addons, activate the recorded skin and reopen Conf. Installed addon versions are retained; differences and unsupported fields appear in the preview. Restore confirms the supported subset and saves the previous values before changing anything. Failures/cancellation trigger rollback; interruption requires Restore recovery before another restore. Recovery holds the most recent restore only. Restart Kodi after restore/recovery.
+
+### Koofr setup
+
+Koofr currently advertises a free 10 GB plan with no credit card required (checked 2026-10-10; future provider terms may change): https://koofr.eu/pricing/ . Create your account yourself, then create a dedicated application password under Koofr Preferences > Password. WebDAV requires that application password, not your main account password: https://koofr.eu/help/koofr_with_webdav/how-do-i-connect-a-service-to-koofr-through-webdav/ .
+
+In Conf Storage settings select Koofr and enter your email and app password **on each device**. Check storage connection creates/confirms `MDM_Builds`. Choose a saved Local build to upload, then Cloud builds on another device to download and preview. Credentials stay in the local Kodi addon settings and are not encrypted by Conf; the password field is masked. Conf excludes its own settings from builds. Custom WebDAV requires a final HTTPS endpoint with no embedded login/query.
+
+Uploads use unique identities, verify downloaded bytes and publish with no overwrite. Interrupted uploads can leave hidden `.upload-*` files; remove those in Koofr if desired. ZIP SHA-256 checks detect corruption but do not authenticate authors: use trusted builds. Transfers and archives are bounded (8 MiB archive / 4 MiB JSON); this configuration format deliberately has no bulk assets. Missing/disabled addons and a different active skin block restore.
+
+Automated verification uses fake Kodi/WebDAV services. Real Koofr credentials and PC/Firestick transfer acceptance remain separate manual checks; no account data is used by the development tests. Full custom skin assets/widget layout portability and automatic device optimisation remain on the roadmap.

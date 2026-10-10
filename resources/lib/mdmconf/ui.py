@@ -13,6 +13,12 @@ def need(data,identifier):
     return True
 
 def dispatch(action,data):
+    if action=='builds':
+        from . import build_ui
+        return build_ui.run()
+    if action=='storage':
+        import xbmcaddon
+        xbmcaddon.Addon('script.mdm.conf').openSettings();return False
     if action=='addons':xbmc.executebuiltin('ActivateWindow(addonbrowser)');return True
     if action=='status':xbmcgui.Dialog().textviewer('MDM Conf - Setup status',status.report(data));return False
     if action=='device':xbmcgui.Dialog().textviewer('MDM Conf - Device information',status.device());return False
@@ -46,7 +52,8 @@ def run():
             data=status.snapshot()
             entries=[('Setup status','status'),('Guided setup','guide'),('Flix / TMDB settings','flix_settings'),
                      ('Provider / source mode settings','provider_settings'),('AllDebrid account tools','account_tools'),
-                     ('Open MDM Flix','flix'),('Manage installed addons','addons'),('Device information','device'),('Refresh status','refresh')]
+                     ('Open MDM Flix','flix'),('Manage installed addons','addons'),('Device information','device'),('Refresh status','refresh'),
+                     ('Build backups / cloud / restore','builds'),('Storage settings','storage')]
             choice=xbmcgui.Dialog().select('MDM Conf - Setup hub',[label for label,action in entries])
             if type(choice) is not int or choice<0:return
             if choice>=len(entries):continue

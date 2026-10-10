@@ -1,0 +1,8 @@
+<settings>
+  <category label="Build storage">
+    <setting id="storage_provider" type="select" label="Storage service" values="Koofr|Custom WebDAV" default="Koofr" />
+    <setting id="storage_endpoint" type="text" label="Custom HTTPS WebDAV address" default="" />
+    <setting id="storage_username" type="text" label="Storage email / username" default="" option="hidden" />
+    <setting id="storage_password" type="text" label="WebDAV application password (not account password)" default="" option="hidden" />
+  </category>
+</settings>
