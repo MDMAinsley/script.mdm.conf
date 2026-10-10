@@ -1,14 +1,14 @@
-# MDM Conf 0.1.0
+# MDM Conf 0.2.1
 
-Run MDM Conf from Program add-ons. This first batch is a standalone setup hub: inspect readiness, follow guided setup, open Flix/TMDB or selected-provider settings, open existing AllDebrid account tools, launch Flix, manage addons, and view device information. Conf needs only Kodi's Python API; it can explain missing addons before the rest of the MDM suite is installed.
+Run MDM Conf from Program add-ons. The standalone setup hub lets you: inspect readiness, follow guided setup, open Flix/TMDB or selected-provider settings, open existing AllDebrid account tools, launch Flix, manage addons, and view device information. Conf needs only Kodi's Python API; it can explain missing addons before the rest of the MDM suite is installed.
 
 Status distinguishes enabled, disabled, missing and unknown addons. Auto currently uses CocoScrapers; its account belongs to Flix. MDM Link owns its separate Free/Debrid/Combined settings and account. Combined without AllDebrid can use free providers; the hub explains how to add debrid candidates. Configured means the relevant value is present, not that credentials have been verified online or a provider will return a source. Custom stream URLs are counted as configured slots, not validated as working free/paid providers.
 
 Conf reads configuration inside Kodi and displays only readiness. It does not copy credentials, alter provider settings, import accounts, enable addons or make account/network requests during a status check. Existing account tools perform their own explicit account actions. Opening the installed-addon browser leaves Conf; open it again after installation or enabling. Settings return to the hub and the next status read is fresh.
 
-Device information reports platform, current total/free memory and current Kodi screen dimensions. Unknown values stay unknown. Current screen dimensions do not establish the display/decoder's maximum capability, and free memory is a transient reading. No automatic tuning or source filtering is enabled in 0.1.0.
+Device information reports platform, current total/free memory and current Kodi screen dimensions. Unknown values stay unknown. Current screen dimensions do not establish the display/decoder's maximum capability, and free memory is a transient reading. Automatic tuning/source policies remain future work.
 
-Portable build backup/restore, private upload/download to other devices, device profiles and bandwidth/file-size filtering are agreed future batches in MDM_Conf_V1_Checklist.md. They are not implemented by this version. The storage service remains to be chosen when the remote-build batch starts.
+Configuration builds, Koofr/WebDAV transfer and journalled restore/recovery are implemented below. Complete custom assets/widgets and automatic optimisation remain future batches in MDM_Conf_V1_Checklist.md.
 
 Implementation references:
 - Kodi addon/settings API: https://xbmc.github.io/docs.kodi.tv/master/kodi-base/dd/dae/group__python__xbmcaddon.html
@@ -33,3 +33,10 @@ In Conf Storage settings select Koofr and enter your email and app password **on
 Uploads use unique identities, verify downloaded bytes and publish with no overwrite. Interrupted uploads can leave hidden `.upload-*` files; remove those in Koofr if desired. ZIP SHA-256 checks detect corruption but do not authenticate authors: use trusted builds. Transfers and archives are bounded (8 MiB archive / 4 MiB JSON); this configuration format deliberately has no bulk assets. Missing/disabled addons and a different active skin block restore.
 
 Automated verification uses fake Kodi/WebDAV services. Real Koofr credentials and PC/Firestick transfer acceptance remain separate manual checks; no account data is used by the development tests. Full custom skin assets/widget layout portability and automatic device optimisation remain on the roadmap.
+
+
+## Restore repair (0.2.1)
+
+Kodi skin writes can return the assigned value, including false or an empty string. Conf verifies saved values instead of requiring a true return. Unchanged settings are skipped to avoid needless callbacks. New journals contain only changed settings; the existing 0.2.0 format and archives remain compatible.
+
+If 0.2.0 left pending recovery, update Conf, keep the recorded skin active, then choose Build backups > Restore recovery **before trying another restore**. Do not delete the journal or replace your saved build. Recovery attempts available safe settings, keeps pending state if any remain unresolved, and names the affected setting identifiers in Restore diagnostics. Diagnostics shows no values, account details or raw exception text. Confirm recovery, restart Kodi, then check your source mode.

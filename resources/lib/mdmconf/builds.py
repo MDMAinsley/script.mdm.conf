@@ -267,18 +267,33 @@ def operation_value(operation):
     if kind=='skin' and safe_key(key):return rpc('Settings.GetSkinSettingValue',{'setting':key})['value']
     raise BuildError('Invalid recovery operation.')
 
+def equivalent(operation,actual):
+    expected=operation['value']
+    if operation['kind']=='addon':
+        defs=definitions(xbmcaddon.Addon(operation['addon']));kind=defs.get(operation['key'])
+        if kind in ('int','integer','number','float') and actual!='' and expected!='' and permitted(kind,actual) and permitted(kind,expected):
+            return float(actual)==float(expected)
+    return type(actual) is type(expected) and actual==expected
+
+def operation_label(operation):
+    owner=operation.get('addon') if operation.get('kind')=='addon' else operation.get('kind')
+    return '{} / {}'.format(owner,operation.get('key'))
+
 def apply(operation):
     # Revalidate destination definitions, including when recovering after a restart.
-    operation_value(operation);kind=operation['kind'];key=operation['key'];value=operation['value']
+    current=operation_value(operation);kind=operation['kind'];key=operation['key'];value=operation['value']
+    if equivalent(operation,current):return # Avoid callbacks/writes for unchanged configuration.
     if kind=='addon':
         target=xbmcaddon.Addon(operation['addon']);defs=definitions(target)
         if not permitted(defs[key],value):raise BuildError('Incompatible addon setting value.')
         target.setSetting(key,value)
-        if target.getSetting(key)!=value:raise BuildError('Kodi did not save an addon setting.')
+        if not equivalent(operation,target.getSetting(key)):raise BuildError('Kodi did not save an addon setting.')
     else:
         if kind=='gui' and not primitive(value) or kind=='skin' and (type(value) not in (str,bool) or not primitive(value)):raise BuildError('Invalid interface setting value.')
         method='Settings.SetSettingValue' if kind=='gui' else 'Settings.SetSkinSettingValue'
-        if rpc(method,{'setting':key,'value':value}) is not True:raise BuildError('Kodi did not apply an interface setting.')
+        # Kodi skin setters return the assigned value (including false/empty string).
+        # Successful RPC plus verified readback is authoritative, not result truthiness.
+        rpc(method,{'setting':key,'value':value})
         actual=operation_value(operation)
         if type(actual) is not type(value) or actual!=value:raise BuildError('Kodi did not save the requested interface value.')
 
@@ -308,10 +323,17 @@ def _recover(check=check_default,update=lambda x,y:None):
     value=journal()
     if value is None or value['state']=='recovered':raise BuildError('No restore recovery is available.')
     if rpc('Settings.GetSettingValue',{'setting':'lookandfeel.skin'}).get('value')!=value['skin']:raise BuildError('Switch back to the recorded build skin before recovering its layout.')
-    for operation in value['before']:check();operation_value(operation)
     value['state']='pending';atomic(journal_path(),encode(value))
+    failures=[]
     for index,operation in enumerate(reversed(value['before'])):
-        check();apply(operation);update(int((index+1)*100/max(len(value['before']),1)),'Recovering previous settings')
+        check()
+        try:apply(operation)
+        except Exception:failures.append(operation_label(operation))
+        update(int((index+1)*100/max(len(value['before']),1)),'Recovering previous settings')
+    value['recovery_errors']=failures[:20];value['recovery_error_count']=len(failures)
+    if failures:
+        atomic(journal_path(),encode(value))
+        raise BuildError('Recovery restored available settings, but {} setting(s) still need recovery: {}. Open Restore diagnostics for details.'.format(len(failures),'; '.join(failures[:3])))
     value['state']='recovered';atomic(journal_path(),encode(value))
 
 def _restore(data,check=check_default,update=lambda x,y:None):
@@ -319,26 +341,43 @@ def _restore(data,check=check_default,update=lambda x,y:None):
     if pending and pending['state']=='pending':raise BuildError('A previous restore needs recovery before another can start.')
     prepared=plan(data,check)
     if prepared['missing'] or prepared['disabled'] or not prepared['skin_matches']:raise BuildError('Install/enable required addons and switch to the build skin before restoring.')
-    before=[]
+    before=[];changed=[]
     for operation in prepared['operations']:
         check();value=operation_value(operation)
         if operation['kind']=='gui' and not primitive(value) or operation['kind']=='skin' and (type(value) not in (str,bool) or not primitive(value)):raise BuildError('Previous interface values cannot be saved safely.')
         if operation['kind'] in ('gui','skin') and type(value) is not type(operation['value']):raise BuildError('Destination interface setting types differ. No settings were changed.')
-        before.append(dict(operation,value=value))
+        if not equivalent(operation,value):before.append(dict(operation,value=value));changed.append(operation)
+    # New journals contain only changed settings. Legacy 0.2.0 full journals remain readable.
     value={'format':1,'state':'pending','skin':data['skin'],'build_id':data['id'],'before':before}
     raw=encode(value)
     if len(raw)>MAX_JSON:raise BuildError('Recovery data exceeds its size limit. No settings were changed.')
     check();atomic(journal_path(),raw)
     try:
-        for index,operation in enumerate(prepared['operations']):
+        for index,operation in enumerate(changed):
             check();apply(operation);update(int((index+1)*100/max(len(before),1)),'Restoring portable settings')
         value['state']='complete';atomic(journal_path(),encode(value))
     except Exception as error:
+        value['state']='pending'
+        value['restore_error']=operation_label(operation) if changed else 'recovery journal'
+        try:atomic(journal_path(),encode(value))
+        except BuildError:pass # Original durable before-values still permit rollback.
         try:_recover() # Recovery ignores the cancelled progress so already-applied changes are undone.
-        except Exception:raise BuildError('Restore stopped and recovery is still needed. Reopen Conf > Build backups > Restore recovery.') from None
+        except Exception:raise BuildError('Restore stopped at {} and recovery is still needed. Reopen Conf > Build backups > Restore recovery; Restore diagnostics shows any remaining settings.'.format(value['restore_error'])) from None
         if isinstance(error,Cancelled):raise Cancelled('Restore cancelled; previous settings recovered.') from None
-        raise BuildError('Restore stopped; previous settings recovered. Check addon compatibility and retry.') from None
+        raise BuildError('Restore stopped at {}; previous settings recovered. Check addon compatibility and retry.'.format(value['restore_error'])) from None
     return prepared
+
+def diagnostics():
+    value=journal()
+    if value is None:return 'No restore recovery record exists.'
+    # Display validated setting identifiers only, never values or raw exception text.
+    labels={operation_label(operation) for operation in value['before']}
+    failed=value.get('restore_error');errors=value.get('recovery_errors',[])
+    lines=['Recovery state: '+value['state'],'Recorded settings: '+str(len(value['before']))]
+    if isinstance(failed,str) and failed in labels:lines.append('Restore stopped at: '+failed)
+    if isinstance(errors,list):lines.extend('Recovery still needed: '+label for label in errors if isinstance(label,str) and label in labels)
+    if value['state']=='pending' and not errors:lines.append('Previous release did not record the failing setting. Run Restore recovery with this update; the existing record is retained.')
+    return '\n'.join(lines)
 
 @contextmanager
 def editing(recovery=False):

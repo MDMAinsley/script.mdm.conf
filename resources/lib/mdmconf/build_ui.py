@@ -78,7 +78,7 @@ def remote():
 def run():
     while not xbmc.Monitor().abortRequested():
         choice=xbmcgui.Dialog().select(TITLE,['Create build','Local builds / preview / upload / restore','Cloud builds / download',
-            'Storage settings','Check storage connection','Restore recovery','Build contents and limits','Back'])
+            'Storage settings','Check storage connection','Restore recovery','Build contents and limits','Back','Restore diagnostics'])
         if type(choice) is not int or choice<0 or choice==7:return False
         try:
             if choice==0:
@@ -107,6 +107,7 @@ def run():
                     'Koofr: enter your email and a dedicated WebDAV application password in Storage settings on each device. Builds use the MDM_Builds folder. Do not use your main account password.\n\n'
                     'Uploads are verified before publication and never overwrite another build. Interrupted uploads may leave hidden .upload files in Koofr; these can be removed there. Integrity checks detect corruption; only restore builds from people you trust.\n\n'
                     'Restore saves recovery data before changing settings. Recover interrupted restores before starting another. Recovery covers the most recent restore only; saving or uploading a build does not replace it.')
+            elif choice==8:xbmcgui.Dialog().textviewer(TITLE,builds.diagnostics())
         except builds.BuildError as error:message(str(error))
         except Exception:message('Build operation failed. Check storage, installed addons and compatibility, then retry. No account details are shown in this error.')
     return False
