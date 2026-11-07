@@ -121,7 +121,7 @@ def report(values):
 def run():
     dialog=xbmcgui.Dialog()
     while True:
-        choice=dialog.select('MDM Conf - Device profiles',['Preview / apply profile','Current device settings','Undo last profile / recover interrupted profile','Flix settings','Link settings'])
+        choice=dialog.select('MDM Conf - Device profiles',['Preview / apply profile','Current device settings','Undo last profile / recover interrupted profile','Flix settings','Link settings','Check DNS and provider connection'])
         if choice<0:return False
         try:
             if choice==0:
@@ -140,5 +140,8 @@ def run():
                 if dialog.yesno('MDM Conf','Restore the device settings saved before the last profile?'):
                     undo();dialog.ok('MDM Conf','Previous device settings restored.')
             elif choice in (3,4):xbmcaddon.Addon(status.FLIX if choice==3 else status.LINK).openSettings()
+            elif choice==5:
+                from . import network
+                network.run()
         except builds.BuildError as error:dialog.ok('MDM Conf',str(error))
         except Exception:dialog.ok('MDM Conf','Device profile is unavailable. Check addon versions and settings.')

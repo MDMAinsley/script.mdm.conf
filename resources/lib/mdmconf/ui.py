@@ -16,6 +16,10 @@ def dispatch(action,data):
     if action=='connections':
         from . import connections
         return connections.run()
+    if action=='network':
+        from . import network
+        network.run()
+        return False
     if action=='profiles':
         from . import profiles
         return profiles.run()
@@ -59,7 +63,8 @@ def run():
             entries=[('Setup status','status'),('Guided setup','guide'),('Flix / TMDB settings','flix_settings'),
                      ('Provider / source mode settings','provider_settings'),('AllDebrid account tools','account_tools'),
                      ('Open MDM Flix','flix'),('Manage installed addons','addons'),('Device information','device'),('Refresh status','refresh'),
-                     ('Build backups / cloud / restore','builds'),('Storage settings','storage'),('Device profiles / quality limits','profiles'),('Connection / file-size preferences','connections')]
+                     ('Build backups / cloud / restore','builds'),('Storage settings','storage'),('Device profiles / quality limits','profiles'),('Connection / file-size preferences','connections'),
+                     ('Check DNS and provider connection','network')]
             choice=xbmcgui.Dialog().select('MDM Conf - Setup hub',[label for label,action in entries])
             if type(choice) is not int or choice<0:return
             if choice>=len(entries):continue

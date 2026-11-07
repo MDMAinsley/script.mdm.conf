@@ -1,3 +1,6 @@
+0.4.2
+- Check device DNS, Cloudflare DNS, and the provider HTTPS path during setup.
+
 0.4.1
 - Check MDM Link first in Auto and recognise all six custom stream feeds.
 
