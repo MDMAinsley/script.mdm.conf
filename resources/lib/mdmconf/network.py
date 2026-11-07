@@ -2,6 +2,7 @@
 from http.client import HTTPSConnection, HTTPException
 import ipaddress
 import json
+import re
 from queue import Empty, Queue
 import socket
 import ssl
@@ -224,8 +225,29 @@ def report(results):
     return '\n'.join(lines)
 
 
+def offer_link_ipv4(dialog, results, link):
+    if (results.get('device_https', {}).get('status') == 'OK'
+            or results.get('alternate_https', {}).get('status') != 'OK'):
+        return
+    version = link.getAddonInfo('version')
+    if not isinstance(version, str) or not re.fullmatch(r'\d+\.\d+\.\d+', version) or tuple(map(int,version.split('.'))) < (0,4,7):
+        dialog.ok('MDM Conf - Network check', 'Update MDM Link to 0.4.7 or later to use the working IPv4 route.')
+        return
+    key = 'device_torrentio_ipv4'
+    if link.getSetting(key) == 'true':
+        return
+    if dialog.yesno('MDM Conf - Use the working route?',
+                    'Use Cloudflare IPv4 for MDM Link’s Torrentio source searches on this device? '
+                    'You can turn it off in MDM Link settings under Torrentio backup connection.'):
+        link.setSetting(key, 'true')
+        saved = link.getSetting(key) == 'true'
+        message = 'Cloudflare IPv4 is enabled for Torrentio searches.' if saved else 'Kodi could not save the setting. Open MDM Link settings to enable it.'
+        dialog.ok('MDM Conf - Network check', message)
+
+
 def run():
     import xbmc
+    import xbmcaddon
     import xbmcgui
 
     dialog = xbmcgui.Dialog()
@@ -241,3 +263,9 @@ def run():
         progress.close()
     if result is not None:
         dialog.textviewer('MDM Conf - Network check', report(result))
+        if result.get('alternate_https', {}).get('status') == 'OK' and result.get('device_https', {}).get('status') != 'OK':
+            try:
+                link = xbmcaddon.Addon('script.mdm.link')
+                offer_link_ipv4(dialog, result, link)
+            except (RuntimeError, ValueError):
+                dialog.ok('MDM Conf - Network check', 'MDM Link settings are unavailable on this device.')
