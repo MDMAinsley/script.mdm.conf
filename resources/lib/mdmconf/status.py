@@ -74,15 +74,16 @@ def snapshot():
     token=credential_present(FLIX,'tmdb_token');key=credential_present(FLIX,'tmdb_api_key')
     tmdb='configured' if token or key else 'unknown' if token is None or key is None else 'needs credentials'
     if tmdb!='configured':issues.append(('TMDB: '+tmdb+'. Open Flix settings to configure the catalogue.','flix_settings'))
-    target=LINK if provider=='MDM Link' else COCO
-    service_owner=LINK if provider=='MDM Link' else FLIX
+    use_link = provider == 'MDM Link' or (provider == 'Auto' and records[LINK]['state'] == 'enabled')
+    target = LINK if use_link else COCO
+    service_owner = LINK if use_link else FLIX
     service=account(service_owner);mode='Debrid';available=None
     if provider=='unknown':issues.append(('Selected provider could not be read. Choose MDM Link or CocoScrapers in Flix settings.','flix_settings'))
     if records[target]['state']!='enabled':issues.append((f"{ADDONS[target]}: {records[target]['state']}. Install/enable the selected provider.",'addons'))
-    if provider=='MDM Link':
+    if use_link:
         mode=setting(LINK,'source_mode');mode='Combined' if mode=='' else mode
         if mode not in ('Free','Debrid','Combined'):mode='unknown';issues.append(('Link source mode could not be read. Choose Free, Debrid or Combined.','provider_settings'))
-        slots=[(credential_present(LINK,'provider_stream_'+str(i)+'_url'),enabled_setting(LINK,'provider_stream_'+str(i)+'_enabled')) for i in range(1,4)]
+        slots=[(credential_present(LINK,'provider_stream_'+str(i)+'_url'),enabled_setting(LINK,'provider_stream_'+str(i)+'_enabled')) for i in range(1,7)]
         custom=any(p is True and e is True for p,e in slots)
         uncertain=any(p is None or (p is True and e is None) for p,e in slots)
         archive=enabled_setting(LINK,'provider_archive');torrentio=enabled_setting(LINK,'provider_torrentio')
@@ -95,10 +96,10 @@ def snapshot():
         if mode=='Combined' and service!='configured':issues.append(('Combined currently uses free sources; AllDebrid is '+service+'. Open account tools to add debrid sources.','account_tools'))
         if mode=='Debrid' and service!='configured':issues.append(('Debrid mode needs AllDebrid enabled and authorised. Current status: '+service+'.','account_tools'))
     elif provider in ('Auto','CocoScrapers') and service!='configured':issues.append(('CocoScrapers needs AllDebrid enabled and authorised in Flix. Current status: '+service+'.','account_tools'))
-    return {'addons':records,'provider':provider,'mode':mode,'tmdb':tmdb,'alldebrid':service,'issues':issues}
+    return {'addons':records,'provider':provider,'provider_addon':target,'mode':mode,'tmdb':tmdb,'alldebrid':service,'issues':issues}
 
 def report(data):
-    lines=['Catalogue (TMDB): '+data['tmdb'],'Selected provider: '+data['provider']+(' (uses CocoScrapers)' if data['provider']=='Auto' else ''),
+    lines=['Catalogue (TMDB): '+data['tmdb'],'Selected provider: '+data['provider']+(' (MDM Link first when enabled)' if data['provider']=='Auto' else ''),
            'Source mode: '+data['mode'],'AllDebrid: '+data['alldebrid'],
            'Configured means credentials are present; account validity and source availability are not checked here.','']
     lines+=['Next steps:']+[message for message,action in data['issues']] if data['issues'] else ['Setup checks complete. Open Flix to browse.']

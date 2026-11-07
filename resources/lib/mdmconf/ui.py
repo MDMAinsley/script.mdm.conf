@@ -29,7 +29,7 @@ def dispatch(action,data):
     if action=='status':xbmcgui.Dialog().textviewer('MDM Conf - Setup status',status.report(data));return False
     if action=='device':xbmcgui.Dialog().textviewer('MDM Conf - Device information',status.device());return False
     if action in ('flix_settings','provider_settings'):
-        identifier=status.FLIX if action=='flix_settings' else status.LINK if data['provider']=='MDM Link' else status.COCO
+        identifier=status.FLIX if action=='flix_settings' else data['provider_addon']
         if action=='provider_settings' and data['provider']=='unknown':message('Choose the provider in Flix settings first.');return False
         if not need(data,identifier):return False
         target=status.addon(identifier)
@@ -37,7 +37,7 @@ def dispatch(action,data):
         target.openSettings();return False
     if action in ('account_tools','flix'):
         if data['provider']=='unknown' and action=='account_tools':message('Choose the provider in Flix settings first.');return False
-        if action=='account_tools' and data['provider']=='MDM Link':
+        if action=='account_tools' and data['provider_addon']==status.LINK:
             if not need(data,status.LINK):return False
             xbmc.executebuiltin('RunAddon(script.mdm.link)');return True
         if not need(data,status.FLIX) or not need(data,status.CORE) or not need(data,status.LINK):return False
