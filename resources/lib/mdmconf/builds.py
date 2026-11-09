@@ -21,6 +21,9 @@ PRIVATE=re.compile(r'password|passwd|secret|token|api.?key|auth|cookie|session|a
 IDENTIFIER=re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}')
 KEY=re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}')
 FILENAME=re.compile(r'[a-z0-9][a-z0-9-]{0,39}-[0-9]{8}T[0-9]{6}Z-([a-f0-9]{32})\.mdmbuild\.zip')
+MDM_SKIN='skin.mdm.skin'
+MDM_ADDONS={'script.mdm.core','plugin.video.mdm.flix','script.mdm.link',MDM_SKIN}
+ACCENT='mdm_home_accent'
 TEXT_ALLOWED={'plugin.video.mdm.flix':{'scraper_provider','playback_mode','tmdb_language'},'script.mdm.link':{'source_mode'}}
 
 class BuildError(Exception):pass
@@ -113,9 +116,37 @@ def installed():
     if len(rows)>MAX_ADDONS:raise BuildError('Too many addons for this build format.')
     return {r['addonid']:r for r in rows if isinstance(r,dict) and identifier(r.get('addonid'))}
 
-def capture(name,check=check_default,update=lambda x,y:None):
+def skin_fields(skin):
+    result=rpc('Settings.GetSkinSettings')
+    if not isinstance(result,dict) or result.get('skin')!=skin or not isinstance(result.get('settings'),list):
+        raise BuildError('Skin settings are unavailable.')
+    return result['settings']
+
+def device_skin_key(key):
+    return any(part.startswith('device_') for part in key.split('.'))
+
+def accent_key(key):
+    return key in (ACCENT,MDM_SKIN+'.'+ACCENT)
+
+def accent_value(value):
+    return isinstance(value,str) and (value=='' or bool(re.fullmatch(r'[A-Fa-f0-9]{6}',value)))
+
+def capture(name,check=check_default,update=lambda x,y:None,*,mdm_only=False):
     name=clean_name(name);rows=installed();addons=[];omitted=0
-    system=Path(xbmcvfs.translatePath('special://xbmc/')).resolve()
+    skin=rpc('Settings.GetSettingValue',{'setting':'lookandfeel.skin'}).get('value')
+    if not identifier(skin) or not skin.startswith('skin.'):raise BuildError('Kodi active skin could not be read.')
+    if mdm_only:
+        allowed=MDM_ADDONS | {skin}
+        flix=rows.get('plugin.video.mdm.flix',{})
+        if flix.get('enabled') is True:
+            try:
+                if xbmcaddon.Addon('plugin.video.mdm.flix').getSetting('scraper_provider')=='CocoScrapers':
+                    allowed.add('script.module.cocoscrapers')
+            except RuntimeError:
+                pass
+        rows={identifier:row for identifier,row in rows.items()
+              if identifier in allowed and row.get('enabled') is True}
+    system=(Path(xbmcvfs.translatePath('special://xbmc/'))/'addons').resolve()
     for index,(id,row) in enumerate(rows.items()):
         check();update(int(index*70/max(len(rows),1)),'Reading portable addon configuration')
         if id=='script.mdm.conf':continue # Storage login and machine-local Conf paths never travel.
@@ -138,16 +169,27 @@ def capture(name,check=check_default,update=lambda x,y:None):
             value=rpc('Settings.GetSettingValue',{'setting':key})['value']
             if primitive(value):gui[key]=value
         except (BuildError,KeyError,TypeError):omitted+=1
-    skin=rpc('Settings.GetSettingValue',{'setting':'lookandfeel.skin'}).get('value')
-    if not identifier(skin) or not skin.startswith('skin.'):raise BuildError('Kodi active skin could not be read.')
     skins={}
     try:
-        result=rpc('Settings.GetSkinSettings')
-        if not isinstance(result,dict) or result.get('skin')!=skin or not isinstance(result.get('settings'),list):raise BuildError('Skin settings are unavailable.')
-        for setting in result.get('settings',[]):
-            if isinstance(setting,dict) and safe_key(setting.get('id')) and type(setting.get('value')) in (str,bool) and primitive(setting['value']):skins[setting['id']]=setting['value']
-            else:omitted+=1
-    except BuildError:omitted+=1
+        for setting in skin_fields(skin):
+            key=setting.get('id') if isinstance(setting,dict) else None
+            value=setting.get('value') if isinstance(setting,dict) else None
+            if safe_key(key) and not device_skin_key(key) and type(value) in (str,bool) and primitive(value):
+                if skin==MDM_SKIN and accent_key(key):
+                    if accent_value(value):
+                        skins[ACCENT]=value
+                    else:
+                        omitted+=1
+                else:
+                    skins[key]=value
+            else:
+                omitted+=1
+    except BuildError:
+        omitted+=1
+    if skin==MDM_SKIN and ACCENT not in skins:
+        value=xbmc.getInfoLabel('Skin.String('+ACCENT+')')
+        if accent_value(value):
+            skins[ACCENT]=value
     return {'format':1,'id':uuid.uuid4().hex,'name':name,'created':datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ'),
             'addons':addons,'gui':gui,'skin':skin,'skin_settings':skins,'omitted':omitted}
 
@@ -238,7 +280,26 @@ def plan(data,check=check_default):
     if data['skin'] not in rows and data['skin'] not in missing:missing.append(data['skin'])
     elif rows.get(data['skin'],{}).get('enabled') is not True and data['skin'] not in disabled:disabled.append(data['skin'])
     for key,value in data['gui'].items():operations.append({'kind':'gui','key':key,'value':value})
-    for key,value in data['skin_settings'].items():operations.append({'kind':'skin','key':key,'value':value})
+    destination={}
+    if skin==data['skin'] and data['skin_settings']:
+        try:
+            destination={row['id']:row.get('value') for row in skin_fields(skin)
+                         if isinstance(row,dict) and isinstance(row.get('id'),str)}
+        except BuildError:
+            pass
+    for key,value in data['skin_settings'].items():
+        check()
+        if device_skin_key(key):
+            skipped+=1
+        elif data['skin']==MDM_SKIN and accent_key(key):
+            if accent_value(value) and (key==ACCENT or ACCENT not in data['skin_settings']):
+                operations.append({'kind':'skin','key':ACCENT,'value':value})
+            else:
+                skipped+=1
+        elif skin!=data['skin'] or key in destination and type(destination[key]) is type(value):
+            operations.append({'kind':'skin','key':key,'value':value})
+        else:
+            skipped+=1
     return {'missing':missing,'disabled':disabled,'version_differences':versions,'skin_matches':skin==data['skin'],
             'operations':operations,'skipped':skipped,'skin':data['skin']}
 
@@ -264,7 +325,10 @@ def operation_value(operation):
         if not permitted(defs[key],value):raise BuildError('This setting cannot be recovered safely.')
         return value
     if kind=='gui' and key in GUI:return rpc('Settings.GetSettingValue',{'setting':key})['value']
-    if kind=='skin' and safe_key(key):return rpc('Settings.GetSkinSettingValue',{'setting':key})['value']
+    if kind=='skin' and safe_key(key):
+        if accent_key(key) and rpc('Settings.GetSettingValue',{'setting':'lookandfeel.skin'}).get('value')==MDM_SKIN:
+            return xbmc.getInfoLabel('Skin.String('+ACCENT+')')
+        return rpc('Settings.GetSkinSettingValue',{'setting':key})['value']
     raise BuildError('Invalid recovery operation.')
 
 def equivalent(operation,actual):
@@ -290,10 +354,15 @@ def apply(operation):
         if not equivalent(operation,target.getSetting(key)):raise BuildError('Kodi did not save an addon setting.')
     else:
         if kind=='gui' and not primitive(value) or kind=='skin' and (type(value) not in (str,bool) or not primitive(value)):raise BuildError('Invalid interface setting value.')
-        method='Settings.SetSettingValue' if kind=='gui' else 'Settings.SetSkinSettingValue'
-        # Kodi skin setters return the assigned value (including false/empty string).
-        # Successful RPC plus verified readback is authoritative, not result truthiness.
-        rpc(method,{'setting':key,'value':value})
+        if kind=='skin' and accent_key(key) and rpc('Settings.GetSettingValue',{'setting':'lookandfeel.skin'}).get('value')==MDM_SKIN:
+            # A fresh skin may not have created this setting yet. The whitelisted
+            # builtin creates it and persists it to the normal skin settings file.
+            if not accent_value(value):raise BuildError('Invalid MDM home accent colour.')
+            xbmc.executebuiltin('Skin.SetString('+ACCENT+','+value+')' if value else 'Skin.Reset('+ACCENT+')',True)
+        else:
+            method='Settings.SetSettingValue' if kind=='gui' else 'Settings.SetSkinSettingValue'
+            # A successful setter can return false or an empty string. Verify readback.
+            rpc(method,{'setting':key,'value':value})
         actual=operation_value(operation)
         if type(actual) is not type(value) or actual!=value:raise BuildError('Kodi did not save the requested interface value.')
 

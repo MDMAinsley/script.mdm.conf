@@ -1,5 +1,6 @@
 """On-device build workflows. Account details never appear in build previews."""
 from contextlib import contextmanager
+from datetime import datetime,timezone
 import xbmc
 import xbmcaddon
 import xbmcgui
@@ -38,6 +39,16 @@ def prerequisites(data,prepared):
         return False
     return None
 
+def restore_build(data,prepared):
+    leave=prerequisites(data,prepared)
+    if leave is not None:return leave
+    if not xbmcgui.Dialog().yesno(TITLE,builds.preview(data,prepared)+'\nRestore these supported settings now?'):
+        return False
+    with progress('Saving recovery data and restoring') as (check,update):
+        builds.restore(data,check,update)
+    message('Supported settings restored. Restart Kodi to refresh affected interfaces. Restore recovery can undo this restore while the recorded skin remains active.')
+    return True
+
 def local_action(path):
     data,prepared=preview(path)
     choice=xbmcgui.Dialog().select(TITLE,['Upload this build','Restore this build','Back'])
@@ -45,12 +56,7 @@ def local_action(path):
         with progress('Uploading and verifying build') as (check,update):client(check,update).upload(path)
         message('Build uploaded and verified. It is available in Cloud builds.')
     elif choice==1:
-        leave=prerequisites(data,prepared)
-        if leave is not None:return leave
-        if not xbmcgui.Dialog().yesno(TITLE,builds.preview(data,prepared)+'\nRestore these supported settings now?'):return False
-        with progress('Saving recovery data and restoring') as (check,update):builds.restore(data,check,update)
-        message('Supported settings restored. Restart Kodi to refresh affected interfaces. Restore recovery can undo this restore while the recorded skin remains active.')
-        return True
+        return restore_build(data,prepared)
     return False
 
 def local():
@@ -65,13 +71,55 @@ def local():
     if type(choice) is int and 0<=choice<len(paths):return local_action(paths[choice])
     return False
 
-def remote():
+def storage_ready():
+    addon=xbmcaddon.Addon('script.mdm.conf')
+    def configured():
+        fields=('storage_username','storage_password')
+        if addon.getSetting('storage_provider')=='Custom WebDAV':
+            fields+=('storage_endpoint',)
+        return all(addon.getSetting(key).strip() for key in fields)
+    if configured():
+        return True
+    if not xbmcgui.Dialog().yesno(TITLE,'Set up cloud storage? Enter your storage username and WebDAV application password on this device.'):
+        return False
+    addon.openSettings()
+    return bool(configured())
+
+def create_cloud():
+    dialog=xbmcgui.Dialog()
+    choice=dialog.select('Choose build contents',['MDM add-ons and current skin (recommended)','All supported add-ons and current skin'])
+    if choice not in (0,1):return False
+    name=dialog.input('Name this configuration build')
+    if not name.strip():return False
+    with progress('Saving portable configuration') as (check,update):
+        data=builds.capture(name,check,update,mdm_only=choice==0)
+        path=builds.save(data,check)
+    if not dialog.yesno(TITLE,'Build saved locally. Upload it to your cloud storage now?'):
+        return False
+    if storage_ready():
+        with progress('Uploading and verifying build') as (check,update):
+            client(check,update).upload(path)
+        message('Build uploaded and verified. On the other device, open Conf and choose Restore a cloud build.')
+    return False
+
+def remote_label(filename):
+    slug,stamp,_=filename.rsplit('-',2)
+    try:
+        created=datetime.strptime(stamp,'%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc).astimezone()
+    except ValueError:
+        return slug.replace('-',' ')
+    return slug.replace('-',' ').capitalize()+' · '+created.strftime('%d %b %Y %H:%M')
+
+def remote(*,guided=False):
+    if guided and not storage_ready():return False
     with progress('Reading cloud builds') as (check,update):
         storage=client(check,update);storage.ensure_folder();names=storage.list()
     if not names:message('No cloud builds yet. Upload a saved build from Local builds.');return False
-    choice=xbmcgui.Dialog().select('Download cloud build',names)
+    choice=xbmcgui.Dialog().select('Choose cloud build',[remote_label(name) for name in names])
     if type(choice) is int and 0<=choice<len(names):
         with progress('Downloading and validating build') as (check,update):path=client(check,update).download(names[choice])
+        if guided:
+            return restore_build(*preview(path))
         return local_action(path)
     return False
 

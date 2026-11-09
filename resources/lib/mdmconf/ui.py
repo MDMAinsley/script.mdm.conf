@@ -55,7 +55,43 @@ def guide(data):
     if type(choice) is int and 0<=choice<len(data['issues']):return dispatch(data['issues'][choice][1],data)
     return False
 
+def setup_device():
+    monitor=xbmc.Monitor()
+    while not monitor.abortRequested():
+        data=status.snapshot()
+        entries=[('Review setup checks','guide'),('Choose this device’s profile','profiles'),
+                 ('Check DNS and provider connection','network'),('Set up cloud storage','storage'),
+                 ('Open MDM Flix','flix'),('Back','back')]
+        choice=xbmcgui.Dialog().select('MDM Conf - Set up this device',[label for label,_ in entries])
+        if type(choice) is not int or not 0<=choice<len(entries) or entries[choice][1]=='back':
+            return False
+        action=entries[choice][1]
+        leave=guide(data) if action=='guide' else dispatch(action,data)
+        if leave:
+            return True
+    return False
+
 def run():
+    from . import build_ui,builds
+    monitor=xbmc.Monitor()
+    entries=(('Set up this device',setup_device),
+             ('Restore a cloud build',lambda:build_ui.remote(guided=True)),
+             ('Create a cloud build',build_ui.create_cloud),
+             ('Open MDM Flix',lambda:dispatch('flix',status.snapshot())),
+             ('More tools',tools))
+    while not monitor.abortRequested():
+        choice=xbmcgui.Dialog().select('MDM Conf',[label for label,_ in entries])
+        if type(choice) is not int or not 0<=choice<len(entries):
+            return
+        try:
+            if entries[choice][1]():
+                return
+        except builds.BuildError as error:
+            message(str(error))
+        except Exception:
+            message('The selected action is unavailable. Check installed add-ons or storage settings and try again.')
+
+def tools():
     monitor=xbmc.Monitor()
     while not monitor.abortRequested():
         try:
@@ -71,7 +107,7 @@ def run():
             action=entries[choice][1]
             if action=='refresh':continue
             leave=guide(data) if action=='guide' else dispatch(action,data)
-            if leave:return
+            if leave:return True
         except Exception:
             message('Setup status or the selected action is unavailable. Check installed addons and try again.')
             return

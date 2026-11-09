@@ -1,3 +1,6 @@
+0.4.4
+Guide fresh setup and cloud restore from the main menu. Add an MDM-only cloud build option and portable home accents.
+
 0.4.3
 - Offer to enable the verified alternate route for MDM Link after the network check.
 

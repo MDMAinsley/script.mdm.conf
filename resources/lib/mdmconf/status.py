@@ -3,6 +3,7 @@ import json
 import re
 import xbmc
 import xbmcaddon
+from pathlib import Path
 
 FLIX='plugin.video.mdm.flix';LINK='script.mdm.link';CORE='script.mdm.core';COCO='script.module.cocoscrapers'
 ADDONS={CORE:'MDM Core',FLIX:'MDM Flix',LINK:'MDM Link','script.mdm.conf':'MDM Conf','skin.mdm.skin':'MDM Skin',
@@ -65,6 +66,17 @@ def account(identifier):
     if not active:return 'disabled'
     return 'configured' if present else 'needs authorisation'
 
+def bundled_catalogue():
+    target=addon(FLIX)
+    if target is None:
+        return False
+    try:
+        import xbmcvfs
+        path=xbmcvfs.translatePath(target.getAddonInfo('path'))
+        return bool(path) and (Path(path)/'resources/lib/catalogue/_tmdb_public_key.py').is_file()
+    except (ImportError,OSError,RuntimeError,TypeError):
+        return False
+
 def snapshot():
     records=inventory();issues=[];provider=setting(FLIX,'scraper_provider')
     provider=provider or 'Auto' if provider is not None else 'unknown'
@@ -73,7 +85,10 @@ def snapshot():
         if records[identifier]['state']!='enabled':issues.append((f"{ADDONS[identifier]}: {records[identifier]['state']}. Install/enable it in Kodi Add-ons.",'addons'))
     token=credential_present(FLIX,'tmdb_token');key=credential_present(FLIX,'tmdb_api_key')
     tmdb='configured' if token or key else 'unknown' if token is None or key is None else 'needs credentials'
-    if tmdb!='configured':issues.append(('TMDB: '+tmdb+'. Open Flix settings to configure the catalogue.','flix_settings'))
+    if tmdb!='configured' and bundled_catalogue():
+        tmdb='bundled access'
+    if tmdb not in ('configured','bundled access'):
+        issues.append(('TMDB: '+tmdb+'. Open Flix settings to configure the catalogue.','flix_settings'))
     use_link = provider == 'MDM Link' or (provider == 'Auto' and records[LINK]['state'] == 'enabled')
     target = LINK if use_link else COCO
     service_owner = LINK if use_link else FLIX
@@ -101,7 +116,7 @@ def snapshot():
 def report(data):
     lines=['Catalogue (TMDB): '+data['tmdb'],'Selected provider: '+data['provider']+(' (MDM Link first when enabled)' if data['provider']=='Auto' else ''),
            'Source mode: '+data['mode'],'AllDebrid: '+data['alldebrid'],
-           'Configured means credentials are present; account validity and source availability are not checked here.','']
+           'Configured or bundled access describes the local setup. Account validity and source availability are not checked here.','']
     lines+=['Next steps:']+[message for message,action in data['issues']] if data['issues'] else ['Setup checks complete. Open Flix to browse.']
     lines+=['','Installed addons:']+[f"{ADDONS[key]}: {row['state']} | {row['version']}" for key,row in data['addons'].items()]
     return '\n'.join(lines)
