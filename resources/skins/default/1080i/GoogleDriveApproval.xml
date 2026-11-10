@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window type="dialog">
+  <defaultcontrol always="true">20</defaultcontrol>
+  <controls>
+    <control type="image">
+      <left>260</left><top>180</top><width>1400</width><height>720</height>
+      <texture>google-approval-background.png</texture>
+    </control>
+    <control type="image" id="12">
+      <left>380</left><top>310</top><width>400</width><height>400</height>
+      <texture>google-device.png</texture>
+      <aspectratio>keep</aspectratio>
+    </control>
+    <control type="label">
+      <left>350</left><top>223</top><width>1220</width><height>72</height>
+      <font>font45</font><textcolor>FFFFFFFF</textcolor><align>center</align>
+      <label>Connect Google Drive</label>
+    </control>
+    <control type="label">
+      <left>830</left><top>340</top><width>750</width><height>60</height>
+      <font>font27</font><textcolor>FFFFFFFF</textcolor><label>Scan or open this address on your phone</label>
+    </control>
+    <control type="label" id="10">
+      <left>830</left><top>415</top><width>750</width><height>60</height>
+      <font>font27</font><textcolor>FFACE5FF</textcolor><scroll>true</scroll>
+    </control>
+    <control type="label">
+      <left>830</left><top>510</top><width>750</width><height>60</height>
+      <font>font27</font><textcolor>FFFFFFFF</textcolor><label>Enter this code on your phone</label>
+    </control>
+    <control type="label" id="11">
+      <left>830</left><top>575</top><width>750</width><height>80</height>
+      <font>font45</font><textcolor>FFACE5FF</textcolor>
+    </control>
+    <control type="button" id="20">
+      <left>760</left><top>755</top><width>400</width><height>80</height>
+      <font>font27</font><textcolor>FFFFFFFF</textcolor><focusedcolor>FFFFFFFF</focusedcolor>
+      <align>center</align><aligny>center</aligny><label>Cancel</label>
+      <texturefocus>google-approval-focus.png</texturefocus>
+      <texturenofocus>google-approval-background.png</texturenofocus>
+    </control>
+  </controls>
+</window>

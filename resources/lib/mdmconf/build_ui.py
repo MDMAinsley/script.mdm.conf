@@ -71,19 +71,35 @@ def local():
     if type(choice) is int and 0<=choice<len(paths):return local_action(paths[choice])
     return False
 
+def storage_configured(addon):
+    provider=addon.getSetting('storage_provider')
+    if provider=='Google Drive':
+        from . import google_drive
+        return google_drive.ready()
+    fields=('storage_username','storage_password')
+    if provider=='Custom WebDAV':
+        fields+=('storage_endpoint',)
+    return all(addon.getSetting(key).strip() for key in fields)
+
+def setup_storage(addon):
+    from . import google_drive
+    if google_drive.configuration():
+        choice=xbmcgui.Dialog().select('Cloud storage',['Connect Google Drive on your phone','Koofr / WebDAV settings','Back'])
+        if choice==0:
+            from . import google_ui
+            return google_ui.connect(addon)
+        if choice!=1:
+            return False
+    addon.openSettings()
+    return storage_configured(addon)
+
 def storage_ready():
     addon=xbmcaddon.Addon('script.mdm.conf')
-    def configured():
-        fields=('storage_username','storage_password')
-        if addon.getSetting('storage_provider')=='Custom WebDAV':
-            fields+=('storage_endpoint',)
-        return all(addon.getSetting(key).strip() for key in fields)
-    if configured():
+    if storage_configured(addon):
         return True
-    if not xbmcgui.Dialog().yesno(TITLE,'Set up cloud storage? Enter your storage username and WebDAV application password on this device.'):
+    if not xbmcgui.Dialog().yesno(TITLE,'Set up cloud storage to continue?'):
         return False
-    addon.openSettings()
-    return bool(configured())
+    return setup_storage(addon)
 
 def create_cloud():
     dialog=xbmcgui.Dialog()
@@ -139,7 +155,7 @@ def run():
                 if local():return True
             elif choice==2:
                 if remote():return True
-            elif choice==3:xbmcaddon.Addon('script.mdm.conf').openSettings()
+            elif choice==3:setup_storage(xbmcaddon.Addon('script.mdm.conf'))
             elif choice==4:
                 with progress('Checking storage login and build folder') as (check,update):
                     storage=client(check,update);storage.ensure_folder();count=len(storage.list())

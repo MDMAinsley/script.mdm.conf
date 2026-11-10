@@ -28,7 +28,8 @@ def dispatch(action,data):
         return build_ui.run()
     if action=='storage':
         import xbmcaddon
-        xbmcaddon.Addon('script.mdm.conf').openSettings();return False
+        from . import build_ui
+        build_ui.setup_storage(xbmcaddon.Addon('script.mdm.conf'));return False
     if action=='addons':xbmc.executebuiltin('ActivateWindow(addonbrowser)');return True
     if action=='status':xbmcgui.Dialog().textviewer('MDM Conf - Setup status',status.report(data));return False
     if action=='device':xbmcgui.Dialog().textviewer('MDM Conf - Device information',status.device());return False

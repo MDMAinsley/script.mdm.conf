@@ -124,18 +124,26 @@ class Client:
     def download(self,name):
         code,raw=self.request('GET',self.path(name),limit=builds.MAX_ARCHIVE)
         if code!=200:raise builds.BuildError('Storage did not return a complete build.')
-        root=builds.directory('builds');path=root/name
-        # Validate in an isolated local temp folder; never overwrite an existing identity.
-        import tempfile
-        with tempfile.TemporaryDirectory(dir=root,prefix='.mdm-download-') as folder:
-            temporary=Path(folder)/name;builds.atomic(temporary,raw);builds.read(temporary);self.tick()
-            if path.exists():
-                if builds.digest(path.read_bytes())!=builds.digest(raw):raise builds.BuildError('A different local file already uses this build identity. Preserve it before downloading.')
-            else:builds.atomic(path,raw)
+        path=cache_download(name,raw,self.tick)
         self.update(100,'Build downloaded and verified');return path
+
+def cache_download(name,raw,check):
+    if not builds.FILENAME.fullmatch(name) or len(raw)>builds.MAX_ARCHIVE:
+        raise builds.BuildError('Invalid downloaded build.')
+    root=builds.directory('builds');path=root/name
+    import tempfile
+    with tempfile.TemporaryDirectory(dir=root,prefix='.mdm-download-') as folder:
+        temporary=Path(folder)/name;builds.atomic(temporary,raw);builds.read(temporary);check()
+        if path.exists():
+            if builds.digest(path.read_bytes())!=builds.digest(raw):raise builds.BuildError('A different local file already uses this build identity. Preserve it before downloading.')
+        else:builds.atomic(path,raw)
+    return path
 
 def configured(addon,check=builds.check_default,update=lambda x,y:None):
     provider=addon.getSetting('storage_provider')
+    if provider=='Google Drive':
+        from . import google_drive
+        return google_drive.configured(check,update)
     if provider not in ('','Koofr','Custom WebDAV'):raise builds.BuildError('Choose a supported storage service in Conf settings.')
     base=KOOFR if provider!='Custom WebDAV' else addon.getSetting('storage_endpoint')
     return Client(base,addon.getSetting('storage_username'),addon.getSetting('storage_password'),check,update)
