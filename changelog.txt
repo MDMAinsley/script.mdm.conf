@@ -1,3 +1,6 @@
+0.4.6
+Offer to restart or close Kodi after a successful build restore, with a Later option.
+
 0.4.5
 Add optional Google Drive build storage with phone approval using the MDM TV client.
 
