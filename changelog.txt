@@ -1,3 +1,6 @@
+0.4.7
+Use the same Close Now and Close Later options after a successful restore on every device.
+
 0.4.6
 Offer to restart or close Kodi after a successful build restore, with a Later option.
 

@@ -46,17 +46,9 @@ def restore_build(data,prepared):
         return False
     with progress('Saving recovery data and restoring') as (check,update):
         builds.restore(data,check,update)
-    can_restart = (not xbmc.getCondVisibility('System.Platform.Android')
-                   and (xbmc.getCondVisibility('System.Platform.Windows')
-                        or xbmc.getCondVisibility('System.Platform.Linux')))
-    if can_restart:
-        body = 'Build restored. Restart Kodi to apply the restored interface settings.'
-        action_label, command = 'Restart Kodi now', 'RestartApp'
-    else:
-        body = 'Build restored. Close Kodi and reopen it from your device to apply the restored interface settings.'
-        action_label, command = 'Close Kodi now', 'Quit'
-    if xbmcgui.Dialog().yesno(TITLE, body, 'Later', action_label):
-        xbmc.executebuiltin(command)
+    body = 'Build restored. Reopen Kodi after closing it to apply the restored interface settings.'
+    if xbmcgui.Dialog().yesno(TITLE, body, 'Close Later', 'Close Now'):
+        xbmc.executebuiltin('Quit')
     return True
 
 def local_action(path):
