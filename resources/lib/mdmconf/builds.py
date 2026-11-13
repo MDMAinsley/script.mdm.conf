@@ -15,6 +15,8 @@ import xbmc
 import xbmcaddon
 import xbmcvfs
 
+from .status import SUBS
+
 MAX_JSON=4*1024*1024;MAX_ARCHIVE=8*1024*1024;MAX_ADDONS=1000;MAX_SETTINGS=10000
 GUI=('lookandfeel.font','lookandfeel.skincolors','lookandfeel.skintheme','lookandfeel.skinzoom','lookandfeel.soundskin')
 PRIVATE=re.compile(r'password|passwd|secret|token|api.?key|auth|cookie|session|account|login|username|email|credential|pin(?:$|[._-])|last_search|alldebrid_enabled',re.I)
@@ -22,7 +24,8 @@ IDENTIFIER=re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}')
 KEY=re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}')
 FILENAME=re.compile(r'[a-z0-9][a-z0-9-]{0,39}-[0-9]{8}T[0-9]{6}Z-([a-f0-9]{32})\.mdmbuild\.zip')
 MDM_SKIN='skin.mdm.skin'
-MDM_ADDONS={'script.mdm.core','plugin.video.mdm.flix','script.mdm.link',MDM_SKIN}
+MDM_ADDONS={'script.mdm.core','plugin.video.mdm.flix','script.mdm.link',MDM_SKIN,SUBS}
+SUBS_SWITCHES={'enable_open','enable_addic','enable_bs','enable_pod','enable_dl','enable_source'}
 ACCENT='mdm_home_accent'
 TEXT_ALLOWED={'plugin.video.mdm.flix':{'scraper_provider','playback_mode','tmdb_language'},'script.mdm.link':{'source_mode'}}
 
@@ -86,14 +89,16 @@ def definitions(target):
         raw=path.read_bytes()
         if b'<!DOCTYPE' in raw.upper() or b'<!ENTITY' in raw.upper():return {}
         root=ET.fromstring(raw);found={}
+        addon_id=target.getAddonInfo('id')
         for setting in root.iter('setting'):
             key=setting.get('id');kind=setting.get('type','').lower()
+            if addon_id==SUBS and (key not in SUBS_SWITCHES or kind not in ('bool','boolean')):continue
             control=setting.find('control')
             if not safe_key(key) or setting.get('option')=='hidden' or setting.get('visible')=='false':continue
             if control is not None and (control.get('format')=='password' or control.find("attributes/attribute[@name='hidden']") is not None):continue
             if kind in ('bool','boolean','int','integer','number','float','enum','labelenum','select'):
                 found[key]=kind
-            elif key in TEXT_ALLOWED.get(target.getAddonInfo('id'),set()):found[key]='text'
+            elif key in TEXT_ALLOWED.get(addon_id,set()):found[key]='text'
         return found
     except Exception:return {}
 

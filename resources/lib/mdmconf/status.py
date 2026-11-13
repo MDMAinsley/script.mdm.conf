@@ -6,8 +6,9 @@ import xbmcaddon
 from pathlib import Path
 
 FLIX='plugin.video.mdm.flix';LINK='script.mdm.link';CORE='script.mdm.core';COCO='script.module.cocoscrapers'
+SUBS='service.subtitles.mdm.subs'
 ADDONS={CORE:'MDM Core',FLIX:'MDM Flix',LINK:'MDM Link','script.mdm.conf':'MDM Conf','skin.mdm.skin':'MDM Skin',
-        'repository.mdm.repo':'MDM Repo','repository.mdm.repo.dev':'MDM Repo (Development)',COCO:'CocoScrapers'}
+        'repository.mdm.repo':'MDM Repo','repository.mdm.repo.dev':'MDM Repo (Development)',COCO:'CocoScrapers',SUBS:'MDM Subs'}
 
 def addon(identifier):
     if identifier not in ADDONS:return None

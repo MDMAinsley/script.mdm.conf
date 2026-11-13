@@ -1,3 +1,6 @@
+0.4.9
+Show MDM Subs in setup status and include its provider switches in portable builds. Sign in or enter provider keys separately on each device.
+
 0.4.8
 Choose a Home mode and see the device recommendation during setup.
 
