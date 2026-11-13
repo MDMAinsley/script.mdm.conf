@@ -1,3 +1,6 @@
+0.4.8
+Choose a Home mode and see the device recommendation during setup.
+
 0.4.7
 Use the same Close Now and Close Later options after a successful restore on every device.
 

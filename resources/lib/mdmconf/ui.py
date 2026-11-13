@@ -13,6 +13,12 @@ def need(data,identifier):
     return True
 
 def dispatch(action,data):
+    if action=='home_mode':
+        if xbmc.getSkinDir()!='skin.mdm.skin':
+            message('Switch to MDM Skin in Kodi’s Interface settings, then return to choose a Home mode.')
+            return False
+        xbmc.executebuiltin('RunScript(special://skin/default.py,choose)')
+        return True
     if action=='connections':
         from . import connections
         return connections.run()
@@ -62,7 +68,7 @@ def setup_device():
         data=status.snapshot()
         entries=[('Review setup checks','guide'),('Choose this device’s profile','profiles'),
                  ('Check DNS and provider connection','network'),('Set up cloud storage','storage'),
-                 ('Open MDM Flix','flix'),('Back','back')]
+                 ('Open MDM Flix','flix'),('Choose Home mode','home_mode'),('Back','back')]
         choice=xbmcgui.Dialog().select('MDM Conf - Set up this device',[label for label,_ in entries])
         if type(choice) is not int or not 0<=choice<len(entries) or entries[choice][1]=='back':
             return False
